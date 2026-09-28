@@ -10,8 +10,6 @@ export default async function quinnBuilder( rootPath, props={} ){
     const root = gltf.scene.children[0];
     const anim = gltf.animations;
 
-    console.log( anim );
-
     // Add toon shader to model
     fixAssetMaterial( root );
 
