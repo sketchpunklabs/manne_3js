@@ -1,0 +1,192 @@
+<!DOCTYPE html><html lang="en"><head><title></title></head>
+<link rel="stylesheet" href="../../lib/ui/App2.css" />
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script src="../../import-map.js"></script><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE } from '@lib/useThreeWebGL2.js';
+import sceneShadowGrid  from '@lib/env/sceneShadowGrid.js';
+import { GLTFLoader }   from 'three/GLTFLoader.js';
+import quinnBuilder     from '../_lib/quinnBuilder.js';
+
+import GroupPanel   from '@lib/ui/GroupPanel.js';
+import DropDown     from '@lib/ui/DropDown.js';
+import ToastStack   from '@lib/ui/ToastStack.js';
+import ToggleBtn    from '@lib/ui/ToggleBtn.js';
+import Timeline     from '@lib/ui/Timeline.js';
+// #endregion
+
+// #region MAIN
+let App   = sceneShadowGrid( useThreeWebGL2() );
+let Debug = {};
+let Ref   = {
+    res     : '../../res',
+    play    : true,
+    dtScl   : 1,
+};
+
+window.addEventListener( 'load', async ()=>{
+   	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   	App.sphericalLook( 20, 20, 3 , [0,0.9,0] );
+    // Debug = await useVisualDebug( App );
+    Ref.toast = document.getElementById( 'toast' );
+    buildUI();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // LOAD IN CHARATER & ANIMATIONS
+    const actor = await quinnBuilder( `${Ref.res}/models`, { shadow:true } );
+    App.scene.add( actor.root );
+    Ref.actor = actor;
+    Ref.actor.inPlace = true;
+
+    await loadAnimSet( 'locomotion.glb' );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.createRenderLoop( onPreRender ).start();
+    appendGithubLink( false );
+});
+
+function onPreRender( dt, et, ts ){
+    if( Ref.play ) Ref.actor?.update( dt * Ref.dtScl );
+}
+
+function animateFrame( dt, atTime=false ){
+    Ref.actor.setTime( dt );
+}
+
+function switchClip( clip ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Ref.sampler.setClip( clip );
+
+    Ref.actor.playClip( clip );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    document.getElementById( 'txtDebug' ).value = clipDebug( clip );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const scrub = document.getElementById( 'timeline' );
+    scrub.max   = clip.duration;
+    scrub.value = 0;
+    scrub.updateTrack( 'Layer1', [ { start: 0, duration: clip.duration } ] );
+
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // if( !Ref.play ) animateFrame( 0, true );
+}
+
+async function loadAnimSet( fname ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // DL if needed
+    let anim = Ref[ fname ];
+    let note;
+    if( !anim ){
+        note         = Ref.toast.msgInfinite( `Downloading ${fname}` );
+        const glb    = await new GLTFLoader().loadAsync( `${Ref.res}/anim/${fname}` );
+        Ref[ fname ] = glb.animations;
+        anim         = glb.animations;
+    }
+
+    Ref.anim = anim; // This is the selected animation set
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // UPDATE SELECTION
+    const data = {};
+    for( const [i,v] of anim.entries() ) data[i] = `${i} - ${v.name}`;
+
+    const dd = document.getElementById( 'ddAnim' );
+    dd.clear().loadDict( data, 0 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // START FIRST ANIMATION
+    switchClip( anim[0] );
+    note?.dismiss();
+}
+
+function buildUI(){
+    const fnClick  = ( id, fn )=>{ document.getElementById( id ).addEventListener( 'click', fn ); };
+    const fnInputF = ( id, fn )=>{ document.getElementById( id ).addEventListener( 'input', e=>fn( parseFloat( e.target.value )) ); };
+    const fnChange = ( id, fn )=>{ document.getElementById( id ).addEventListener( 'change', e=>fn( e.target.value ) ); };
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const scrub = document.getElementById( 'timeline' );
+    scrub.addTrack( 'Layer1' );
+    scrub.addEventListener( 'input', e=>animateFrame( e.detail.value, true ) );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // fnInputF( 'inpScale', v=>{ Ref.dtScl = v } );
+    fnInputF( 'inpChibi', v=>{ Ref.actor.setChibi( v ) } );
+    fnChange( 'btnInPlace', v=>{ Ref.actor.inPlace = !!v } );
+    fnChange( 'btnPlay', v=>{ Ref.play = !!v } );
+    fnChange( 'ddAnim', v=>switchClip( Ref.anim[v] ) );
+    fnChange( 'ddSets', v=>loadAnimSet( v ) );
+}
+// #endregion
+
+// #region DEBUG
+function clipDebug( c ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    let fCnt = c.tracks.reduce( (v,i)=>Math.max( v,i.times.length), 0 );
+    let txt  = `NAME: ${c.name}\nDuration: ${c.duration.toFixed(2)}s\nFrames: ${fCnt}\nTracks: ${c.tracks.length}`;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    let sclCnt = 0;
+    let posCnt = 0;
+    let rotCnt = 0;
+    let pName;
+    for( const t of c.tracks ){
+        pName = t.name.substr( t.name.lastIndexOf( '.' )+1 );
+        switch( pName ){
+            case 'quaternion' : rotCnt++; break;
+            case 'position'   : posCnt++; break;
+            case 'scale'      : sclCnt++; break;
+        }
+    }
+
+    txt += `\n-- Rot: ${rotCnt}\n-- Pos: ${posCnt}\n-- Scl: ${sclCnt}`;
+    return txt;
+}
+// #endregion
+</script>
+
+<group-panel label="" float style="position:fixed; left:calc(100vw - 310px); top:10px; width:300px;">
+    <section class="grpItem">
+        <label>Animations</label>
+        <drop-down id="ddSets">
+            <option value="locomotion.glb" selected>Locomotion</option>
+            <option value="jump.glb">Jump</option>
+            <option value="crouch.glb">Crouch</option>
+            <option value="flying.glb">Flying</option>
+            <option value="combat.glb">Combat</option>
+        </drop-down>
+
+        <drop-down id="ddAnim"></drop-down>
+
+        <div class="flexRow auto">
+            <toggle-btn id="btnPlay" label="Playing" labeloff="Paused" checked></toggle-btn>
+            <toggle-btn id="btnInPlace" label="In Place" labeloff="Walk Out" value="true"></toggle-btn>
+        </div>
+    </section>
+
+    <section class="grpItem">
+        <label>Animation Scaler</label>
+        <input type="range" id="inpScale" class="rngInp"  min="0.1" max="2.0" value="1" step="0.1">
+    </section>
+
+    <section class="grpItem">
+        <label>Chibi / Goblin Moade</label>
+        <input type="range" id="inpChibi" class="rngInp" min="0" max="1" value="0" step="0.1">
+    </section>
+
+    <section class="grpItem">
+        <label>Scrub</label>
+        <time-line id="timeline"></time-line>
+    </section>
+
+    <section class="grpItem">
+        <label>Debug</label>
+        <textarea id="txtDebug" class="txtArea" spellcheck="false" rows="8"></textarea>
+    </section>
+</group-panel>
+
+<toast-stack id="toast" style="position:fixed; bottom:10px; right:10px; width:300px;"></toast-stack>
+
+</body></html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html><html lang="en"><head><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script src="../import-map.js"></script><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '@lib/useThreeWebGL2.js';
+import facedCube           	from '@lib/meshes/FacedCube.js';
+// #endregion
+
+// #region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Debug = {};
+let Ref   = {};
+
+window.addEventListener( 'load', async ()=>{
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	App.sphericalLook( 0, 20, 6 );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Debug.pnt
+        .add( [-1,0,0], 0x00ffff, 4, 1 )
+        .add( [1,0,0],  0x00ffff, 6, 2 )
+        .add( [0,1,0],  0xffff00, 6, 5 );
+
+    Debug.ln
+        .add( [-1,0,0], [-1,1,0], 0x00ffff, 0xffff00, false )
+        .add( [1,0,0],  [1,1,0],  0x00ffff, 0xffff00, false )
+        .add( [-1,1,0], [1,1,0],  0xffff00, null, true );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const cube = facedCube();
+    cube.position.set( 0, 0, 0 );
+    App.scene.add( cube );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // App.createRenderLoop( onPreRender ).start();
+    App.renderLoop();
+});
+
+function onPreRender( dt, et ){}
+// #endregion
+</script></body></html>
+
+<!--
+https://codesandbox.io/p/sandbox/sew669?file=%2Fsrc%2FApp.js%3A148%2C1-160%2C79
+const gridConfig = {
+    cellSize: 0.5,
+    cellThickness: 0.5,
+    cellColor: '#6f6f6f',
+    sectionSize: 3,
+    sectionThickness: 1,
+    sectionColor: '#9d4b4b',
+    fadeDistance: 30,
+    fadeStrength: 1,
+    followCamera: false,
+    infiniteGrid: true
+  }
+  return <Grid position={[0, -0.01, 0]} args={[10.5, 10.5]} {...gridConfig} />
+
+  Nice coloring, Fading and Infinite
+https://github.com/pmndrs/drei/blob/58a4ea64874a335fa5fcd3e19b263b1a01a6ebe0/src/core/Grid.tsx
+
+// Fit to Box
+https://github.com/yomotsu/camera-controls/blob/02e1e9b87a42d461e7142705e93861c81739bbd5/src/CameraControls.ts#L1908
+-->
